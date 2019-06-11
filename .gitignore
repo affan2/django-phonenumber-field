@@ -1,6 +1,7 @@
 *.pyc
 *.pyo
 .installed.cfg
+.tox
 bin
 develop-eggs
 dist
@@ -33,3 +34,4 @@ tests/tmp/
 *.coverage
 htmlcov/
 share/
+.coverage*

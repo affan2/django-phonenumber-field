@@ -1,18 +1,18 @@
-#-*- coding: utf-8 -*-
-from django.core import validators
+from django.conf import settings
+from django.core import checks
 from django.db import models
-from django.utils.translation import ugettext_lazy as _
-from phonenumber_field.validators import validate_international_phonenumber
+from django.utils.encoding import force_text
+from django.utils.translation import gettext_lazy as _
+
 from phonenumber_field import formfields
-from phonenumber_field.phonenumber import PhoneNumber, to_python
-from phonenumbers.phonenumberutil import NumberParseException
-import phonenumbers
+from phonenumber_field.phonenumber import PhoneNumber, to_python, validate_region
+from phonenumber_field.validators import validate_international_phonenumber
 
 
-class PhoneNumberDescriptor(object):
+class PhoneNumberDescriptor:
     """
-    The descriptor for the phone number attribute on the model instance. Returns a PhoneNumber when accessed so you can
-    do stuff like::
+    The descriptor for the phone number attribute on the model instance.
+    Returns a PhoneNumber when accessed so you can do stuff like::
 
         >>> instance.phone_number.as_international
 
@@ -26,61 +26,81 @@ class PhoneNumberDescriptor(object):
     def __init__(self, field):
         self.field = field
 
-    def __get__(self, instance=None, owner=None):
+    def __get__(self, instance, owner):
         if instance is None:
-            raise AttributeError(
-                "The '%s' attribute can only be accessed from %s instances."
-                % (self.field.name, owner.__name__))
-        return instance.__dict__[self.field.name]
+            return self
+
+        # The instance dict contains whatever was originally assigned in
+        # __set__.
+        if self.field.name in instance.__dict__:
+            value = instance.__dict__[self.field.name]
+        else:
+            instance.refresh_from_db(fields=[self.field.name])
+            value = getattr(instance, self.field.name)
+        return value
 
     def __set__(self, instance, value):
-        instance.__dict__[self.field.name] = to_python(value)
+        instance.__dict__[self.field.name] = to_python(value, region=self.field.region)
 
 
-class PhoneNumberField(models.Field):
+class PhoneNumberField(models.CharField):
     attr_class = PhoneNumber
     descriptor_class = PhoneNumberDescriptor
     default_validators = [validate_international_phonenumber]
 
     description = _("Phone number")
 
-    def __init__(self, *args, **kwargs):
-        kwargs['max_length'] = kwargs.get('max_length', 128)
-        super(PhoneNumberField, self).__init__(*args, **kwargs)
-        self.validators.append(validators.MaxLengthValidator(self.max_length))
+    def __init__(self, *args, region=None, **kwargs):
+        kwargs.setdefault("max_length", 128)
+        super().__init__(*args, **kwargs)
+        self._region = region
 
-    def get_internal_type(self):
-        return "CharField"
+    @property
+    def region(self):
+        return self._region or getattr(settings, "PHONENUMBER_DEFAULT_REGION", None)
+
+    def check(self, **kwargs):
+        errors = super().check(**kwargs)
+        errors.extend(self._check_region())
+        return errors
+
+    def _check_region(self):
+        try:
+            validate_region(self.region)
+        except ValueError as e:
+            return [checks.Error(force_text(e), obj=self)]
+        return []
 
     def get_prep_value(self, value):
-        "Returns field's value prepared for saving into a database."
-        if value is None:
-            return None
-        value = to_python(value)
-        if isinstance(value, basestring):
-            # it is an invalid phone number
-            return value
-        return value.as_e164
+        """
+        Perform preliminary non-db specific value checks and conversions.
+        """
+        if value:
+            if not isinstance(value, PhoneNumber):
+                value = to_python(value)
 
-    def contribute_to_class(self, cls, name):
-        super(PhoneNumberField, self).contribute_to_class(cls, name)
+            if not value.is_valid():
+                raise ValueError("“%s” is not a valid phone number." % value.raw_input)
+
+            format_string = getattr(settings, "PHONENUMBER_DB_FORMAT", "E164")
+            fmt = PhoneNumber.format_map[format_string]
+            value = value.format_as(fmt)
+        return super().get_prep_value(value)
+
+    def contribute_to_class(self, cls, name, *args, **kwargs):
+        super().contribute_to_class(cls, name, *args, **kwargs)
         setattr(cls, self.name, self.descriptor_class(self))
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        kwargs["region"] = self._region
+        return name, path, args, kwargs
 
     def formfield(self, **kwargs):
         defaults = {
-            'form_class': formfields.PhoneNumberField,
+            "form_class": formfields.PhoneNumberField,
+            "region": self.region,
+            "error_messages": self.error_messages,
         }
         defaults.update(kwargs)
-        return super(PhoneNumberField, self).formfield(**defaults)
-
-try:
-    from south.modelsinspector import add_introspection_rules
-    add_introspection_rules([
-        (
-            [PhoneNumberField],
-            [],
-            {},
-        ),
-    ], ["^phonenumber_field\.modelfields\.PhoneNumberField"])
-except ImportError:
-    pass
+        return super().formfield(**defaults)
