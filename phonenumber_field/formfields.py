@@ -4,8 +4,8 @@ from django.core.exceptions import ValidationError
 from django.forms.fields import CharField
 from django.utils.translation import gettext as _
 
-from phonenumber_field.phonenumber import to_python, validate_region
-from phonenumber_field.validators import validate_international_phonenumber
+from .phonenumber import to_python, validate_region
+from .validators import validate_international_phonenumber
 
 
 class PhoneNumberField(CharField):

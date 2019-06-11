@@ -1,6 +1,6 @@
 from django import forms
 
-from phonenumber_field.formfields import PhoneNumberField
+from ..formfields import PhoneNumberField
 
 from .models import NullablePhoneNumber
 

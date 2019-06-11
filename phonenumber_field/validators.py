@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from phonenumber_field.phonenumber import to_python
+from .phonenumber import to_python
 
 
 def validate_international_phonenumber(value):

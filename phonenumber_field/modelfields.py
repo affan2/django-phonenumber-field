@@ -4,9 +4,9 @@ from django.db import models
 from django.utils.encoding import force_text
 from django.utils.translation import gettext_lazy as _
 
-from phonenumber_field import formfields
-from phonenumber_field.phonenumber import PhoneNumber, to_python, validate_region
-from phonenumber_field.validators import validate_international_phonenumber
+from . import formfields
+from .phonenumber import PhoneNumber, to_python, validate_region
+from .validators import validate_international_phonenumber
 
 
 class PhoneNumberDescriptor:

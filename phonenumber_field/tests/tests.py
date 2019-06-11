@@ -6,10 +6,10 @@ from django.test import TestCase, override_settings
 from django.utils.encoding import force_text
 from phonenumbers import phonenumberutil
 
-from phonenumber_field import formfields, modelfields
-from phonenumber_field.modelfields import PhoneNumberField
-from phonenumber_field.phonenumber import PhoneNumber, to_python
-from phonenumber_field.widgets import PhoneNumberInternationalFallbackWidget
+from .. import formfields, modelfields
+from .. modelfields import PhoneNumberField
+from .. phonenumber import PhoneNumber, to_python
+from .. widgets import PhoneNumberInternationalFallbackWidget
 
 from . import models
 from .forms import CustomPhoneNumberFormField, PhoneNumberForm
