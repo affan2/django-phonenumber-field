@@ -18,7 +18,7 @@ class PhonePrefixSelect(Select):
         language = translation.get_language() or settings.LANGUAGE_CODE
         if language:
             locale = Locale(translation.to_locale(language))
-            for prefix, values in _COUNTRY_CODE_TO_REGION_CODE.items():
+            for prefix, values in list(_COUNTRY_CODE_TO_REGION_CODE.items()):
                 prefix = "+%d" % prefix
                 if initial and initial in values:
                     self.initial = prefix
